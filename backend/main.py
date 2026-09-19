@@ -5,6 +5,8 @@ Loads the CLIP model once at startup, embeds an uploaded photo or a text
 query into the same vector space the recipe corpus was indexed in, and
 returns the nearest recipes from the FAISS index.
 """
+from __future__ import annotations
+
 import io
 import json
 from contextlib import asynccontextmanager

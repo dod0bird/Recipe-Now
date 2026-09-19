@@ -4,6 +4,8 @@ weights) into a single shared vector space, then build FAISS indices over
 each so the backend can do image->recipe and text->recipe search with the
 same model.
 """
+from __future__ import annotations
+
 from pathlib import Path
 
 import faiss

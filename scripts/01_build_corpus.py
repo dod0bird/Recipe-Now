@@ -11,6 +11,8 @@ git repo). This mirrors the "photo -> ingredient -> recipe" flow many
 cooking apps use, and keeps every image in this project a genuine photograph
 rather than a placeholder.
 """
+from __future__ import annotations
+
 import ast
 import itertools
 import random
