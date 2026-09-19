@@ -9,5 +9,5 @@ fastapi
 uvicorn[standard]
 python-multipart
 scikit-learn
-umap-learn
+umap-learn<0.5.7
 tqdm
