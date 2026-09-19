@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+
+# large / regenerable artifacts - see README for how to rebuild these
+data/raw/
+data/processed/
+data/index/
+models/

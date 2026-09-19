@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recipe Now - Cluster Map</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         max-width: 1000px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.4rem; margin-bottom: 4px; }
+  p.subtitle { color: #666; margin-top: 0; }
+  nav a { margin-right: 16px; font-size: 0.9rem; }
+  #legend { display: flex; flex-wrap: wrap; gap: 10px 18px; margin: 12px 0 8px; font-size: 0.8rem; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+  #canvas-wrap { position: relative; border: 1px solid #ddd; border-radius: 10px; }
+  canvas { display: block; width: 100%; cursor: crosshair; }
+  #tooltip { position: absolute; pointer-events: none; background: rgba(20,20,20,0.9);
+             color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem;
+             display: none; max-width: 220px; }
+  .status { color: #777; font-size: 0.9rem; margin-top: 8px; }
+</style>
+</head>
+<body>
+  <h1>Recipe embedding cluster map</h1>
+  <p class="subtitle">
+    Each dot is one recipe's photo embedding (CLIP), grouped into
+    <strong>K-Means</strong> clusters and projected to 2D with
+    <strong>UMAP</strong> &mdash; recipes near each other visually and
+    semantically end up near each other on the map.
+  </p>
+  <nav><a href="/">Search</a><a href="/cluster.html">Cluster map</a></nav>
+  <div id="legend"></div>
+  <div id="canvas-wrap">
+    <canvas id="plot" width="960" height="640"></canvas>
+    <div id="tooltip"></div>
+  </div>
+  <div class="status" id="status">Loading cluster map...</div>
+
+<script>
+const PALETTE = ["#e6194b","#3cb44b","#ffe119","#4363d8","#f58231","#911eb4",
+                  "#46f0f0","#f032e6","#bcf60c","#fabebe","#008080","#e6beff"];
+
+const canvas = document.getElementById("plot");
+const ctx = canvas.getContext("2d");
+const tooltip = document.getElementById("tooltip");
+const statusEl = document.getElementById("status");
+const legendEl = document.getElementById("legend");
+
+let points = [];
+
+function toScreen(x, y, bounds) {
+  const pad = 30;
+  const w = canvas.width - pad * 2;
+  const h = canvas.height - pad * 2;
+  const sx = pad + ((x - bounds.minX) / (bounds.maxX - bounds.minX)) * w;
+  const sy = pad + ((y - bounds.minY) / (bounds.maxY - bounds.minY)) * h;
+  return [sx, sy];
+}
+
+function draw(bounds) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (const p of points) {
+    const [sx, sy] = toScreen(p.x, p.y, bounds);
+    ctx.beginPath();
+    ctx.arc(sx, sy, 3.2, 0, Math.PI * 2);
+    ctx.fillStyle = PALETTE[p.cluster % PALETTE.length];
+    ctx.globalAlpha = 0.75;
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+async function load() {
+  const res = await fetch("/cluster-map");
+  const data = await res.json();
+  points = data.points;
+
+  const xs = points.map(p => p.x), ys = points.map(p => p.y);
+  const bounds = { minX: Math.min(...xs), maxX: Math.max(...xs),
+                    minY: Math.min(...ys), maxY: Math.max(...ys) };
+
+  draw(bounds);
+  statusEl.textContent = `${points.length} recipes, ${data.n_clusters} clusters`;
+
+  for (const [cid, name] of Object.entries(data.cluster_names)) {
+    const item = document.createElement("span");
+    item.innerHTML = `<span class="swatch" style="background:${PALETTE[cid % PALETTE.length]}"></span>${name}`;
+    legendEl.appendChild(item);
+  }
+
+  canvas.addEventListener("mousemove", e => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+
+    let closest = null, closestDist = 12;
+    for (const p of points) {
+      const [sx, sy] = toScreen(p.x, p.y, bounds);
+      const d = Math.hypot(sx - mx, sy - my);
+      if (d < closestDist) { closestDist = d; closest = p; }
+    }
+    if (closest) {
+      tooltip.style.display = "block";
+      tooltip.style.left = (e.clientX - rect.left + 14) + "px";
+      tooltip.style.top = (e.clientY - rect.top + 10) + "px";
+      tooltip.innerHTML = `<strong>${closest.title}</strong><br>${closest.category}`;
+    } else {
+      tooltip.style.display = "none";
+    }
+  });
+}
+
+load().catch(err => statusEl.textContent = "Failed to load cluster map: " + err);
+</script>
+</body>
+</html>

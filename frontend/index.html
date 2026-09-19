@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recipe Now</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.6rem; margin-bottom: 4px; }
+  p.subtitle { color: #666; margin-top: 0; }
+  nav a { margin-right: 16px; font-size: 0.9rem; }
+  .tabs { display: flex; gap: 8px; margin: 20px 0 12px; }
+  .tab-btn { padding: 8px 16px; border: 1px solid #ccc; border-radius: 8px;
+             background: none; cursor: pointer; font-size: 0.95rem; }
+  .tab-btn.active { background: #222; color: #fff; border-color: #222; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .dropzone { border: 2px dashed #aaa; border-radius: 12px; padding: 32px;
+              text-align: center; cursor: pointer; }
+  .dropzone.drag { border-color: #333; background: rgba(0,0,0,0.03); }
+  #preview { max-width: 220px; max-height: 220px; margin-top: 12px; border-radius: 8px; }
+  input[type=text] { width: 100%; padding: 10px 12px; font-size: 1rem;
+                      border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
+  .results { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+             gap: 16px; margin-top: 24px; }
+  .card { border: 1px solid #ddd; border-radius: 10px; overflow: hidden;
+          display: flex; flex-direction: column; }
+  .card img { width: 100%; height: 150px; object-fit: cover; background: #f2f2f2; }
+  .card .body { padding: 10px 12px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .card h3 { font-size: 0.95rem; margin: 0; }
+  .card .score { font-size: 0.75rem; color: #888; }
+  .card .cat { font-size: 0.75rem; color: #4a7; font-weight: 600; }
+  details summary { cursor: pointer; font-size: 0.8rem; color: #555; }
+  .status { color: #777; font-size: 0.9rem; margin-top: 12px; }
+</style>
+</head>
+<body>
+  <h1>Recipe Now</h1>
+  <p class="subtitle">Snap a photo of an ingredient (or type what you're craving) and get matching recipes, ranked by CLIP embedding similarity.</p>
+  <nav><a href="/">Search</a><a href="/cluster.html">Cluster map</a></nav>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="image">Search by photo</button>
+    <button class="tab-btn" data-tab="text">Search by text</button>
+  </div>
+
+  <div class="panel active" id="panel-image">
+    <div class="dropzone" id="dropzone">
+      <p>Click to choose a photo, or drag one here</p>
+      <input type="file" id="fileInput" accept="image/*" style="display:none">
+      <img id="preview" style="display:none">
+    </div>
+  </div>
+
+  <div class="panel" id="panel-text">
+    <input type="text" id="textInput" placeholder="e.g. roasted lemon chicken, spicy tomato pasta...">
+  </div>
+
+  <div class="status" id="status"></div>
+  <div class="results" id="results"></div>
+
+<script>
+const tabs = document.querySelectorAll(".tab-btn");
+const panels = { image: document.getElementById("panel-image"), text: document.getElementById("panel-text") };
+tabs.forEach(btn => btn.addEventListener("click", () => {
+  tabs.forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  Object.values(panels).forEach(p => p.classList.remove("active"));
+  panels[btn.dataset.tab].classList.add("active");
+}));
+
+const statusEl = document.getElementById("status");
+const resultsEl = document.getElementById("results");
+
+function renderResults(results) {
+  resultsEl.innerHTML = "";
+  if (!results.length) { statusEl.textContent = "No matches found."; return; }
+  statusEl.textContent = `Top ${results.length} matches`;
+  for (const r of results) {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <img src="${r.image_url}" alt="${r.category}">
+      <div class="body">
+        <span class="cat">${r.category}</span>
+        <h3>${r.title}</h3>
+        <span class="score">similarity ${(r.score * 100).toFixed(1)}%</span>
+        <details>
+          <summary>Ingredients & instructions</summary>
+          <p><strong>Ingredients:</strong> ${r.ingredients.join(", ")}</p>
+          <p><strong>Instructions:</strong> ${r.instructions}</p>
+        </details>
+      </div>`;
+    resultsEl.appendChild(card);
+  }
+}
+
+// image search
+const dropzone = document.getElementById("dropzone");
+const fileInput = document.getElementById("fileInput");
+const preview = document.getElementById("preview");
+
+dropzone.addEventListener("click", () => fileInput.click());
+["dragover", "dragleave", "drop"].forEach(evt =>
+  dropzone.addEventListener(evt, e => {
+    e.preventDefault();
+    dropzone.classList.toggle("drag", evt === "dragover");
+  })
+);
+dropzone.addEventListener("drop", e => {
+  const file = e.dataTransfer.files[0];
+  if (file) handleImage(file);
+});
+fileInput.addEventListener("change", () => {
+  if (fileInput.files[0]) handleImage(fileInput.files[0]);
+});
+
+async function handleImage(file) {
+  preview.src = URL.createObjectURL(file);
+  preview.style.display = "block";
+  statusEl.textContent = "Embedding photo with CLIP and searching...";
+  resultsEl.innerHTML = "";
+
+  const form = new FormData();
+  form.append("file", file);
+  try {
+    const res = await fetch("/search/image", { method: "POST", body: form });
+    const data = await res.json();
+    renderResults(data.results);
+  } catch (err) {
+    statusEl.textContent = "Search failed: " + err;
+  }
+}
+
+// text search
+const textInput = document.getElementById("textInput");
+let debounceTimer;
+textInput.addEventListener("input", () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(runTextSearch, 400);
+});
+
+async function runTextSearch() {
+  const query = textInput.value.trim();
+  if (!query) { resultsEl.innerHTML = ""; statusEl.textContent = ""; return; }
+  statusEl.textContent = "Searching...";
+  try {
+    const res = await fetch("/search/text", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, top_k: 12 }),
+    });
+    const data = await res.json();
+    renderResults(data.results);
+  } catch (err) {
+    statusEl.textContent = "Search failed: " + err;
+  }
+}
+</script>
+</body>
+</html>

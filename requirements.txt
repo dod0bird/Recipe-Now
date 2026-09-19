@@ -1,0 +1,12 @@
+torch
+open_clip_torch
+faiss-cpu
+pandas
+numpy
+pillow
+fastapi
+uvicorn[standard]
+python-multipart
+scikit-learn
+umap-learn
+tqdm
