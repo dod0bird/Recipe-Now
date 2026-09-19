@@ -7,6 +7,13 @@ returns the nearest recipes from the FAISS index.
 """
 from __future__ import annotations
 
+import os
+
+# torch and faiss each ship their own OpenMP runtime; loading both in one
+# process aborts on macOS with "OMP Error #15" unless this is set before
+# either library is imported.
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+
 import io
 import json
 from contextlib import asynccontextmanager
