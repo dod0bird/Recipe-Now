@@ -46,10 +46,35 @@ data/index/          FAISS indices + embedding matrices
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-python scripts/01_build_corpus.py      # clean recipes, link to ingredient photos
-python scripts/02_embed_and_index.py   # CLIP-embed everything, build FAISS index
-python scripts/03_cluster.py           # K-Means + UMAP cluster map
+bash scripts/00_fetch_data.sh           # clone the 2 source datasets + CLIP weights
+python scripts/01_build_corpus.py       # clean recipes, link to ingredient photos
+python scripts/02_embed_and_index.py    # CLIP-embed everything, build FAISS index
+python scripts/03_cluster.py            # K-Means + UMAP cluster map
 
 uvicorn backend.main:app --reload
-# open frontend/index.html (served by the backend at /)
+# open http://localhost:8000  (search UI + /cluster.html)
 ```
+
+## Current corpus stats
+
+- **10,350 recipes** matched to a real ingredient photo (76.7% of the 13,493
+  source recipes — the rest didn't mention any of the 63 supported
+  ingredient categories and were dropped)
+- **63 ingredient categories**, e.g. Onion, Lemon, Tomato, Potato, Bell
+  Pepper, Coconut, Ginger, Strawberry
+- CLIP embeddings: 512-dim, `ViT-B-32-quickgelu` / LAION-400M
+- Photo search example: a photo of an orange bell pepper returns
+  "Slow-Roasted Cod with Bell Peppers and Capers" at 99% cosine similarity
+- 12 K-Means clusters over the embedding space, visualized via UMAP at
+  `/cluster.html`
+
+## Honest limitations (worth knowing before you demo it)
+
+- Images are photos of **ingredients**, not of finished plated dishes — the
+  original Epicurious recipe photos aren't redistributable, so this project
+  substitutes a real photo of the recipe's key ingredient. A photo of a
+  finished lasagna won't match well; a photo of a tomato, lemon, or onion
+  will.
+- Text search reuses the image index (both live in CLIP's shared space), so
+  it works best for ingredient-forward queries ("lemon dessert") rather than
+  abstract ones ("something comforting for a rainy day").
