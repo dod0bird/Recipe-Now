@@ -53,9 +53,16 @@ Requires a free Kaggle account (Kaggle isn't reachable from a sandboxed
 environment, so this step has to run on your own machine):
 
 1. Create an API token at https://www.kaggle.com/settings/account →
-   "Create New Token" (downloads `kaggle.json`).
-2. `mkdir -p ~/.kaggle && mv ~/Downloads/kaggle.json ~/.kaggle/ && chmod 600 ~/.kaggle/kaggle.json`
+   API → "Create New Token" (Kaggle currently issues a `KGAT_...` bearer
+   token string; a legacy `kaggle.json` username+key file also works if
+   that's what you get).
+2. `mkdir -p ~/.kaggle && echo YOUR_TOKEN_HERE > ~/.kaggle/access_token && chmod 600 ~/.kaggle/access_token`
 3. `bash scripts/00b_fetch_kaggle_dataset.sh`
+
+This uses `curl` directly against Kaggle's REST API rather than the
+`kaggle` pip package -- that package's support for the newer bearer-token
+format requires Python 3.11+, which would force a Python upgrade for no
+good reason.
 
 The corpus builder samples this down to `MAX_RECIPES` (6,000 by default —
 edit the constant at the top of `scripts/01_build_corpus.py` to change it)
