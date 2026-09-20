@@ -9,16 +9,16 @@ semantically similar dishes back.
 
 | Search by photo | Search by text | Cluster map |
 |---|---|---|
-| ![Search by photo](docs/screenshots/search-photo.png) | ![Search by text](docs/screenshots/search-text.png) | ![Cluster map](docs/screenshots/cluster-map.png) |
+| ![Search by photo](docs/screenshots/search-photo.png) | ![Search by text](docs/screenshots/search-text.png) | ![Cluster map](docs/screenshots/cluster-map.jpg) |
 
 ## How it works
 
 1. **Recipe corpus** — real dishes, each with a real photo of the finished
    dish and its actual recipe (title, ingredients, instructions), built from
-   the Kaggle Epicurious dataset (~13,500 dishes, sampled down for a
-   reasonable CLIP-embedding runtime on a laptop CPU). A small hand-curated
-   format is also supported for quick iteration — see "Building the
-   corpus" below.
+   the Kaggle Epicurious dataset (~13,500 dishes total, sampled down to
+   ~6,000 for a reasonable CLIP-embedding runtime on a laptop CPU). A small
+   hand-curated format is also supported for quick iteration — see
+   "Building the corpus" below.
 2. **Embeddings** — every dish photo and every recipe's text are embedded
    with **CLIP** (`ViT-B-32-quickgelu`, LAION-400M weights, via
    [`open_clip`](https://github.com/mlfoundations/open_clip)), an open-source
