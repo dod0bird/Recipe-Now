@@ -32,7 +32,12 @@
   .card h3 { font-size: 0.95rem; margin: 0; }
   .card .score { font-size: 0.75rem; color: #888; }
   .card .cat { font-size: 0.75rem; color: #4a7; font-weight: 600; }
-  details summary { cursor: pointer; font-size: 0.8rem; color: #555; }
+  details summary { cursor: pointer; font-size: 0.8rem; color: #555; margin-bottom: 6px; }
+  details .section-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+                            letter-spacing: 0.03em; color: #888; margin: 10px 0 4px; }
+  details ul, details ol { margin: 0; padding-left: 20px; font-size: 0.85rem; line-height: 1.5; }
+  details ul li, details ol li { margin-bottom: 4px; }
+  details p { font-size: 0.85rem; line-height: 1.5; margin: 0; }
   .status { color: #777; font-size: 0.9rem; margin-top: 12px; }
 </style>
 </head>
@@ -74,23 +79,53 @@ tabs.forEach(btn => btn.addEventListener("click", () => {
 const statusEl = document.getElementById("status");
 const resultsEl = document.getElementById("results");
 
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str ?? "";
+  return div.innerHTML;
+}
+
+// Recipe text comes from different sources with different conventions --
+// some have one step per line (real newlines), some are one long sentence
+// with inline "1. ... 2. ..." numbering, and some are just a single
+// paragraph. Render whichever applies as a proper list, falling back to
+// plain text.
+function splitSteps(instructions) {
+  const byNewline = instructions.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  if (byNewline.length > 1) return byNewline;
+
+  const byNumbering = instructions.split(/(?=\d+\.\s)/).map(s => s.trim()).filter(Boolean);
+  if (byNumbering.length > 1) return byNumbering;
+
+  return [instructions.trim()];
+}
+
 function renderResults(results) {
   resultsEl.innerHTML = "";
   if (!results.length) { statusEl.textContent = "No matches found."; return; }
   statusEl.textContent = `Top ${results.length} matches`;
   for (const r of results) {
+    const ingredientsHtml = `<ul>${r.ingredients.map(i => `<li>${escapeHtml(i)}</li>`).join("")}</ul>`;
+
+    const steps = splitSteps(r.instructions);
+    const instructionsHtml = steps.length > 1
+      ? `<ol>${steps.map(s => `<li>${escapeHtml(s.replace(/^\d+\.\s*/, ""))}</li>`).join("")}</ol>`
+      : `<p>${escapeHtml(steps[0])}</p>`;
+
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `
-      <img src="${r.image_url}" alt="${r.category}">
+      <img src="${r.image_url}" alt="${escapeHtml(r.category)}">
       <div class="body">
-        <span class="cat">${r.category}</span>
-        <h3>${r.title}</h3>
+        <span class="cat">${escapeHtml(r.category)}</span>
+        <h3>${escapeHtml(r.title)}</h3>
         <span class="score">similarity ${(r.score * 100).toFixed(1)}%</span>
         <details>
           <summary>Ingredients & instructions</summary>
-          <p><strong>Ingredients:</strong> ${r.ingredients.join(", ")}</p>
-          <p><strong>Instructions:</strong> ${r.instructions}</p>
+          <div class="section-label">Ingredients</div>
+          ${ingredientsHtml}
+          <div class="section-label">Instructions</div>
+          ${instructionsHtml}
         </details>
       </div>`;
     resultsEl.appendChild(card);

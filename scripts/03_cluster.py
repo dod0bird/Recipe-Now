@@ -64,11 +64,19 @@ def main():
             "y": float(coords[i, 1]),
         })
 
-    # a readable label per cluster: its most common ingredient category
+    # a readable label per cluster: its most common category, preferring any
+    # real category over "Other" so a handful of miscategorized titles don't
+    # blot out an otherwise clearly-themed cluster (e.g. mostly "Pasta" with
+    # a couple of "Other" titles should still be labeled "Pasta").
     cluster_labels_readable = {}
     for c in range(n_clusters):
         cats = df["category"].iloc[np.where(cluster_labels == c)[0]]
-        cluster_labels_readable[c] = cats.value_counts().idxmax() if len(cats) else f"Cluster {c}"
+        if len(cats) == 0:
+            cluster_labels_readable[c] = f"Cluster {c}"
+            continue
+        counts = cats.value_counts()
+        non_other = counts.drop("Other", errors="ignore")
+        cluster_labels_readable[c] = non_other.idxmax() if len(non_other) else "Other"
 
     out = {
         "n_clusters": n_clusters,

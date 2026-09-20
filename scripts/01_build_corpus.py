@@ -48,35 +48,76 @@ IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png"]
 
 # simple keyword -> dish-type bucket, checked in order, first match wins.
 # This is only used to label groups on the /cluster.html map -- it has no
-# effect on search or ranking.
+# effect on search or ranking. Word-boundary matching avoids the obvious
+# substring traps (e.g. "egg" inside "eggplant", "ham" inside "hamburger",
+# "tart" inside "steak tartare").
+#
+# Order matters: protein/seafood identity is checked first since it's the
+# most specific, reliable signal in a title (e.g. "Crab Cakes" should read
+# as Seafood, not Cake & Cupcakes just because of the word "cake"; "Miso-
+# Butter Roast Chicken" should read as Chicken, not Japanese just because
+# it mentions miso). Distinct dish-forms and cuisines come next, and the
+# most generic dessert/baked-good buckets are checked last.
 CATEGORY_KEYWORDS = [
-    ("Cake", ["cake", "cupcake", "brownie"]),
-    ("Cookie", ["cookie", "biscotti"]),
-    ("Pie & Tart", ["pie", "tart"]),
-    ("Bread & Baked Goods", ["bread", "biscuit", "muffin", "scone", "roll"]),
+    ("Seafood", ["fish", "shrimp", "salmon", "tuna", "crab", "lobster", "scallop",
+                 "seafood", "cod", "halibut", "oyster", "clam", "mussel", "ceviche"]),
+    ("Chicken & Poultry", ["chicken", "turkey", "duck", "poultry"]),
+    ("Beef", ["beef", "steak", "brisket", "short rib", "meatloaf", "meatball"]),
+    ("Pork", ["pork", "bacon", "ham", "sausage", "prosciutto"]),
+    ("Lamb", ["lamb"]),
+    ("Egg Dishes", ["egg", "eggs", "omelet", "frittata", "quiche"]),
     ("Pizza", ["pizza"]),
-    ("Pasta & Noodles", ["pasta", "spaghetti", "noodle", "lasagna", "ravioli", "macaroni", "fettuccine"]),
-    ("Soup & Stew", ["soup", "stew", "chowder", "bisque"]),
-    ("Salad", ["salad"]),
-    ("Sandwich & Handheld", ["sandwich", "burger", "taco", "burrito", "wrap"]),
     ("Curry", ["curry"]),
-    ("Seafood", ["fish", "shrimp", "salmon", "tuna", "crab", "lobster", "scallop", "seafood"]),
-    ("Chicken & Poultry", ["chicken", "turkey", "duck"]),
-    ("Beef", ["beef", "steak", "brisket"]),
-    ("Pork", ["pork", "bacon", "ham", "sausage"]),
-    ("Egg Dishes", ["egg", "omelet", "frittata", "quiche"]),
-    ("Rice & Grains", ["risotto", "quinoa", "rice", "grain"]),
-    ("Breakfast", ["pancake", "waffle", "granola", "oatmeal"]),
-    ("Drinks & Cocktails", ["cocktail", "smoothie", "margarita", "punch"]),
-    ("Dessert", ["chocolate", "ice cream", "pudding", "custard", "mousse", "sorbet", "cheesecake"]),
-    ("Vegetable Dishes", ["vegetable", "broccoli", "spinach", "kale", "cauliflower"]),
+    ("Mexican", ["taco", "burrito", "quesadilla", "enchilada", "guacamole", "nachos", "fajita"]),
+    ("Mediterranean", ["hummus", "falafel", "kebab", "tzatziki", "tabbouleh", "shawarma", "pita"]),
+    ("Sushi & Japanese", ["sushi", "ramen", "udon", "teriyaki", "tempura", "miso"]),
+    ("Asian Stir-Fry & Dumplings", ["stir-fry", "stir fry", "dumpling", "pad thai",
+                                     "kimchi", "hoisin", "spring roll", "potsticker"]),
+    ("Pasta & Noodles", ["pasta", "spaghetti", "noodle", "lasagna", "ravioli", "macaroni",
+                          "fettuccine", "gnocchi", "orzo", "linguine", "ziti"]),
+    ("Soup & Stew", ["soup", "stew", "chowder", "bisque", "gumbo", "chili"]),
+    ("Salad", ["salad"]),
+    ("Sandwich & Burgers", ["sandwich", "burger", "wrap", "panini", "sub"]),
+    ("Vegetable Dishes", ["eggplant", "broccoli", "spinach", "kale", "cauliflower",
+                           "zucchini", "mushroom", "vegetable"]),
+    ("Rice & Grains", ["risotto", "quinoa", "rice", "barley", "couscous"]),
+    ("Cake & Cupcakes", ["cake", "cupcake"]),
+    ("Cookie", ["cookie", "biscotti"]),
+    ("Brownies & Bars", ["brownie", "blondie", "lemon bar", "date bar"]),
+    ("Pie & Tart", ["pie", "tart", "tarte"]),
+    ("Cobbler & Crisp", ["cobbler", "crisp", "crumble"]),
+    ("Bread & Baked Goods", ["bread", "biscuit", "muffin", "scone", "bagel", "cinnamon roll", "dinner roll"]),
+    ("Breakfast", ["pancake", "waffle", "granola", "oatmeal", "crepe", "french toast"]),
+    ("Drinks & Cocktails", ["cocktail", "smoothie", "margarita", "punch", "sangria", "mocktail"]),
+    ("Dip & Appetizer", ["dip", "bruschetta", "crostini", "spread"]),
+    ("Dessert", ["chocolate", "ice cream", "pudding", "custard", "mousse",
+                 "sorbet", "cheesecake", "tiramisu", "fudge"]),
+]
+
+# keywords that commonly appear fused into a larger word ("burger" inside
+# "hamburger"/"cheeseburger") need the leading boundary relaxed, or they'd
+# never match at all.
+_SUFFIX_ONLY_KEYWORDS = {"burger"}
+
+
+def _keyword_pattern(kw: str) -> str:
+    escaped = re.escape(kw)
+    # trailing "s?" catches simple plurals ("cakes", "rolls", "tacos");
+    # irregular plurals (e.g. "sandwiches") aren't covered by this heuristic.
+    if kw in _SUFFIX_ONLY_KEYWORDS:
+        return escaped + r"s?\b"
+    return r"\b" + escaped + r"s?\b"
+
+
+_CATEGORY_PATTERNS = [
+    (name, re.compile("|".join(_keyword_pattern(kw) for kw in keywords), re.IGNORECASE))
+    for name, keywords in CATEGORY_KEYWORDS
 ]
 
 
 def categorize(title: str) -> str:
-    low = title.lower()
-    for category, keywords in CATEGORY_KEYWORDS:
-        if any(kw in low for kw in keywords):
+    for category, pattern in _CATEGORY_PATTERNS:
+        if pattern.search(title):
             return category
     return "Other"
 
