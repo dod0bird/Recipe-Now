@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PROCESSED_DIR = ROOT / "data" / "processed"
 INDEX_DIR = ROOT / "data" / "index"
 
-N_CLUSTERS = 12
+MAX_CLUSTERS = 12
 
 
 def main():
@@ -23,12 +23,26 @@ def main():
     vectors = np.load(INDEX_DIR / "image_vectors.npy")
     assert len(df) == len(vectors)
 
-    print(f"Clustering {len(vectors)} recipes into {N_CLUSTERS} groups (K-Means)")
-    kmeans = KMeans(n_clusters=N_CLUSTERS, n_init=10, random_state=42)
+    # both K-Means and UMAP need their hyperparameters scaled down for a
+    # small corpus (e.g. a first pass with 10 hand-picked dishes) --
+    # n_clusters can't exceed the number of points, and UMAP's n_neighbors
+    # needs to be smaller than the number of points too.
+    n_clusters = max(1, min(MAX_CLUSTERS, len(vectors) // 2, len(vectors)))
+    n_neighbors = max(1, min(15, len(vectors) - 1))
+
+    print(f"Clustering {len(vectors)} recipes into {n_clusters} groups (K-Means)")
+    kmeans = KMeans(n_clusters=n_clusters, n_init=10, random_state=42)
     cluster_labels = kmeans.fit_predict(vectors)
 
     print("Projecting to 2D with UMAP")
-    reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, metric="cosine", random_state=42)
+    # init="random" instead of the default "spectral": spectral init does an
+    # eigen-decomposition that outright fails on very small corpora (a first
+    # pass with ~10 dishes) and was already silently falling back on the
+    # full 10k+ corpus too -- random init works at every scale.
+    reducer = umap.UMAP(
+        n_neighbors=n_neighbors, min_dist=0.1, metric="cosine",
+        init="random", random_state=42,
+    )
     coords = reducer.fit_transform(vectors)
 
     points = []
@@ -45,12 +59,12 @@ def main():
 
     # a readable label per cluster: its most common ingredient category
     cluster_labels_readable = {}
-    for c in range(N_CLUSTERS):
+    for c in range(n_clusters):
         cats = df["category"].iloc[np.where(cluster_labels == c)[0]]
         cluster_labels_readable[c] = cats.value_counts().idxmax() if len(cats) else f"Cluster {c}"
 
     out = {
-        "n_clusters": N_CLUSTERS,
+        "n_clusters": n_clusters,
         "cluster_names": cluster_labels_readable,
         "points": points,
     }
