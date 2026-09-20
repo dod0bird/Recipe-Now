@@ -1,27 +1,40 @@
 # Recipe Now — find a recipe from a photo of a dish
 
-Take a picture of a finished dish, get back the closest matching recipes. A
-text search box also works, using the same embedding space.
+Take a picture of a finished dish, get back the closest matching real
+recipes, ranked by similarity. A text search box works the same way, using
+the same embedding space — type "spicy noodle soup" and get visually and
+semantically similar dishes back.
+
+## Demo
+
+| Search by photo | Search by text | Cluster map |
+|---|---|---|
+| ![Search by photo](docs/screenshots/search-photo.png) | ![Search by text](docs/screenshots/search-text.png) | ![Cluster map](docs/screenshots/cluster-map.png) |
 
 ## How it works
 
 1. **Recipe corpus** — real dishes, each with a real photo of the finished
-   dish and its actual recipe (title, ingredients, instructions). Two
-   sources are supported (see "Building the corpus" below): the full Kaggle
-   Epicurious dataset (~13,500 dishes, sampled down to a few thousand), or a
-   small hand-curated set for quick iteration.
+   dish and its actual recipe (title, ingredients, instructions), built from
+   the Kaggle Epicurious dataset (~13,500 dishes, sampled down for a
+   reasonable CLIP-embedding runtime on a laptop CPU). A small hand-curated
+   format is also supported for quick iteration — see "Building the
+   corpus" below.
 2. **Embeddings** — every dish photo and every recipe's text are embedded
    with **CLIP** (`ViT-B-32-quickgelu`, LAION-400M weights, via
    [`open_clip`](https://github.com/mlfoundations/open_clip)), an open-source
    CLIP variant. Images and text land in the *same* vector space, which is
    what makes a single index searchable by either a photo or a sentence.
 3. **Vector index** — embeddings are indexed with **FAISS** for fast
-   approximate nearest-neighbor search.
+   approximate nearest-neighbor search and ranking.
 4. **API** — a **FastAPI** backend exposes `/search/image` (upload a photo)
-   and `/search/text` (type a query), both returning ranked recipe results.
-5. **Clustering / visualization** — recipe embeddings are clustered with
+   and `/search/text` (type a query), both returning ranked recipe results
+   with a cosine-similarity score.
+5. **Clustering / visualization** — recipe embeddings are grouped with
    **K-Means** (unsupervised learning) and projected to 2D with **UMAP** for
-   a visual map of "what recipes are near what," served at `/cluster-map`.
+   a visual map of "what recipes are near what," served at `/cluster.html`.
+   Each recipe's dish-type category (pizza, seafood, dessert, etc.) is
+   auto-derived from its title with a keyword heuristic, used only to label
+   groups on this map — it has no effect on search or ranking.
 
 ## Project layout
 
@@ -29,6 +42,7 @@ text search box also works, using the same embedding space.
 scripts/               data pipeline: fetch, build corpus, embed, index, cluster
 backend/                FastAPI app serving search + static images
 frontend/               single-page UI (vanilla JS)
+docs/screenshots/       demo images used in this README
 data/custom_dishes/     small hand-curated dish photos + recipes.csv (see its README)
 data/raw/kaggle_epicurious/   full Kaggle dataset once fetched (git-ignored)
 data/processed/         cleaned recipes.parquet + recipe_images/ + cluster_map.json (generated)
@@ -67,10 +81,7 @@ good reason.
 The corpus builder samples this down to `MAX_RECIPES` (6,000 by default —
 edit the constant at the top of `scripts/01_build_corpus.py` to change it)
 to keep CLIP embedding time reasonable on a laptop CPU, while still clearing
-a 5,000+ recipe target. Since this dataset has no dish-category column, one
-is auto-derived per recipe from a keyword heuristic on its title (pizza,
-soup, dessert, etc.) purely to label groups on the cluster map — it has no
-effect on search or ranking, which is entirely embedding-based.
+a 5,000+ recipe target.
 
 **Option B — a small hand-curated set**, for a fast first pass before
 pulling in the full dataset. See `data/custom_dishes/README.md` for the
@@ -80,7 +91,7 @@ Then, regardless of which source you used:
 
 ```bash
 python scripts/01_build_corpus.py       # build recipes.parquet from whichever source is present
-python scripts/02_embed_and_index.py    # CLIP-embed everything, build FAISS index (~1 min per ~150 photos on CPU)
+python scripts/02_embed_and_index.py    # CLIP-embed everything, build FAISS index
 python scripts/03_cluster.py            # K-Means + UMAP cluster map
 
 uvicorn backend.main:app --reload
