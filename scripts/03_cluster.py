@@ -34,16 +34,23 @@ def main():
     kmeans = KMeans(n_clusters=n_clusters, n_init=10, random_state=42)
     cluster_labels = kmeans.fit_predict(vectors)
 
-    print("Projecting to 2D with UMAP")
-    # init="random" instead of the default "spectral": spectral init does an
-    # eigen-decomposition that outright fails on very small corpora (a first
-    # pass with ~10 dishes) and was already silently falling back on the
-    # full 10k+ corpus too -- random init works at every scale.
-    reducer = umap.UMAP(
-        n_neighbors=n_neighbors, min_dist=0.1, metric="cosine",
-        init="random", random_state=42,
-    )
-    coords = reducer.fit_transform(vectors)
+    if len(vectors) < 3:
+        # UMAP needs at least a couple of neighbors to mean anything; for a
+        # tiny smoke-test corpus just space points out arbitrarily so the
+        # map still renders instead of crashing.
+        print(f"Only {len(vectors)} recipes -- skipping UMAP, using placeholder coordinates")
+        coords = np.array([[float(i), 0.0] for i in range(len(vectors))])
+    else:
+        print("Projecting to 2D with UMAP")
+        # init="random" instead of the default "spectral": spectral init does
+        # an eigen-decomposition that outright fails on very small corpora
+        # and was already silently falling back on the full 10k+ corpus too
+        # -- random init works at every scale.
+        reducer = umap.UMAP(
+            n_neighbors=n_neighbors, min_dist=0.1, metric="cosine",
+            init="random", random_state=42,
+        )
+        coords = reducer.fit_transform(vectors)
 
     points = []
     for i, row in enumerate(df.itertuples()):

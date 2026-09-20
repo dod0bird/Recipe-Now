@@ -11,3 +11,4 @@ python-multipart
 scikit-learn
 umap-learn<0.5.7
 tqdm
+kaggle
