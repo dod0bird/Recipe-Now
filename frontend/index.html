@@ -35,8 +35,14 @@
   details summary { cursor: pointer; font-size: 0.8rem; color: #555; margin-bottom: 6px; }
   details .section-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
                             letter-spacing: 0.03em; color: #888; margin: 10px 0 4px; }
-  details ul, details ol { margin: 0; padding-left: 20px; font-size: 0.85rem; line-height: 1.5; }
-  details ul li, details ol li { margin-bottom: 4px; }
+  details ul.ingredients { margin: 0; padding-left: 22px; font-size: 0.85rem;
+                            line-height: 1.5; list-style: disc outside; }
+  details ul.ingredients li { margin-bottom: 8px; }
+  details ol.instructions { margin: 0; padding-left: 22px; font-size: 0.85rem;
+                             line-height: 1.6; list-style: decimal outside; }
+  details ol.instructions li { margin-bottom: 14px; padding-left: 4px; }
+  details ol.instructions li::marker { font-weight: 600; color: #4a7; }
+  details ul.ingredients li:last-child, details ol.instructions li:last-child { margin-bottom: 0; }
   details p { font-size: 0.85rem; line-height: 1.5; margin: 0; }
   .status { color: #777; font-size: 0.9rem; margin-top: 12px; }
 </style>
@@ -105,11 +111,11 @@ function renderResults(results) {
   if (!results.length) { statusEl.textContent = "No matches found."; return; }
   statusEl.textContent = `Top ${results.length} matches`;
   for (const r of results) {
-    const ingredientsHtml = `<ul>${r.ingredients.map(i => `<li>${escapeHtml(i)}</li>`).join("")}</ul>`;
+    const ingredientsHtml = `<ul class="ingredients">${r.ingredients.map(i => `<li>${escapeHtml(i)}</li>`).join("")}</ul>`;
 
     const steps = splitSteps(r.instructions);
     const instructionsHtml = steps.length > 1
-      ? `<ol>${steps.map(s => `<li>${escapeHtml(s.replace(/^\d+\.\s*/, ""))}</li>`).join("")}</ol>`
+      ? `<ol class="instructions">${steps.map(s => `<li>${escapeHtml(s.replace(/^\d+\.\s*/, ""))}</li>`).join("")}</ol>`
       : `<p>${escapeHtml(steps[0])}</p>`;
 
     const card = document.createElement("div");
