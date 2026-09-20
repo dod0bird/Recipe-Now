@@ -103,6 +103,4 @@ uvicorn backend.main:app --reload
 At this dataset's scale (thousands of rows, a few hundred MB of images),
 pandas is the appropriate tool for the corpus-cleaning step in
 `scripts/01_build_corpus.py` — reaching for PySpark here would be
-distributed-computing overhead the data doesn't need. If you want a PySpark
-version of the same ETL step for the resume line, ask and it can be added
-as a supplementary script alongside the pandas one.
+distributed-computing overhead the data doesn't need.
